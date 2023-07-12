@@ -1,0 +1,10 @@
+﻿################################################################################
+# Данный GITIGNORE-файл был автоматически создан Microsoft(R) Visual Studio.
+################################################################################
+
+*.lock
+*.ipch
+/.vs/Serial-port-display/v17
+/.vs/Serial-port-display/FileContentIndex
+/x64/Debug/Serial-p.1f189ada.tlog
+/x64/Debug
