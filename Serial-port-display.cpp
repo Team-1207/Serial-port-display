@@ -6,7 +6,7 @@
 
 #define TIMER_ID 1
 
-const wchar_t* g_szClassName = L"myWindowClass";
+const char* g_szClassName = "myWindowClass";
 static HWND hEdit = NULL;
 
 
@@ -15,6 +15,7 @@ std::mutex g_mutex;
 std::condition_variable g_cv;
 std::string g_message;
 bool g_isReading = false;
+bool g_isRunning = false;
 
 LRESULT CALLBACK WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -23,7 +24,7 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
         case WM_CREATE:
         {
             // Создаем текстовый контрол для вывода текста
-            hEdit = CreateWindowEx (WS_EX_CLIENTEDGE, L"EDIT", L"", WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL, 0, 0, 0, 0, hwnd, (HMENU) 1, GetModuleHandle (NULL), NULL);
+            hEdit = CreateWindowEx (WS_EX_CLIENTEDGE, "EDIT", "", WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_MULTILINE | ES_AUTOVSCROLL, 0, 0, 0, 0, hwnd, (HMENU) 1, GetModuleHandle (NULL), NULL);
             SendMessage (hEdit, EM_LIMITTEXT, 0, 0);
             break;
         }
@@ -31,7 +32,7 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (wParam == TIMER_ID)
             {
                 // Очищаем содержимое текстового контрола
-                SetWindowText (hEdit, L"");
+                SetWindowText (hEdit, "");
             }
             break;
         case WM_SIZE:
@@ -64,7 +65,7 @@ LRESULT CALLBACK WndProc (HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 void ReadFromComPort ()
 {
     // Открываем COM-порт
-    HANDLE hComm = CreateFile (L"COM7", GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hComm = CreateFile ("COM3", GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
     if (hComm != INVALID_HANDLE_VALUE)
     {
         DCB dcbSerialParams = {};
@@ -83,7 +84,7 @@ void ReadFromComPort ()
                 COMSTAT comStat = {};
                 DWORD dwBytesRead = 0;
 
-                while (true)
+                while (g_isRunning)
                 {
                     ClearCommError (hComm, &dwErrors, &comStat);
                     if (comStat.cbInQue > 0)
@@ -129,15 +130,15 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     wc.lpszClassName = g_szClassName;
     if (!RegisterClassEx (&wc))
     {
-        MessageBox (NULL, L"Window Registration Failed!", L"Error!", MB_ICONEXCLAMATION | MB_OK);
+        MessageBox (NULL, "Window Registration Failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
         return 0;
     }
 
     // Создаем окно
-    HWND hwnd = CreateWindowEx (0, g_szClassName, L"My Window", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 640, 480, NULL, NULL, hInstance, NULL);
+    HWND hwnd = CreateWindowEx (0, g_szClassName, "Serial port display", WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1024, 512, NULL, NULL, hInstance, NULL);
     if (hwnd == NULL)
     {
-        MessageBox (NULL, L"Window Creation Failed!", L"Error!", MB_ICONEXCLAMATION | MB_OK);
+        MessageBox (NULL, "Window Creation Failed!", "Error!", MB_ICONEXCLAMATION | MB_OK);
         return 0;
     }
 
@@ -146,6 +147,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     UpdateWindow (hwnd);
 
     // Запускаем поток чтения данных из COM-порта
+    g_isRunning = true;
     std::thread comThread (ReadFromComPort);
 
     // Обрабатываем сообщения в основном потоке
@@ -159,7 +161,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
         if (g_isReading)
         {
             std::unique_lock<std::mutex> lock (g_mutex);
-            SetWindowText (hEdit, L"");
+            SetWindowText (hEdit, "");
             SendMessage (hEdit, EM_SETSEL, -1, -1);
             SendMessage (hEdit, EM_REPLACESEL, FALSE, (LPARAM) g_message.c_str ()); // выводим данные на экран
             g_message.clear ();
@@ -169,6 +171,7 @@ int WINAPI WinMain (HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLin
     }
 
     // Ожидаем завершения потока чтения данных из COM-порта
+    g_isRunning = false;
     comThread.join ();
 
     return 0;
